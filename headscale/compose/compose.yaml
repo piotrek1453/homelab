@@ -1,0 +1,49 @@
+services:
+  headscale:
+    image: ghcr.io/juanfont/headscale:v0.29.4
+    container_name: headscale
+    command: serve
+    user: "10001:10001"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /opt/headscale/config:/etc/headscale:ro,z
+      - /opt/headscale/data:/var/lib/headscale:Z
+      - /opt/headscale/run:/var/run/headscale:Z
+    networks:
+      - headscale-net
+
+  caddy:
+    image: docker.io/library/caddy:2.10.2
+    container_name: headscale-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+    volumes:
+      - /opt/headscale/caddy/Caddyfile:/etc/caddy/Caddyfile:ro,Z
+      - /opt/headscale/caddy/data:/data:Z
+      - /opt/headscale/caddy/config:/config:Z
+    networks:
+      - headscale-net
+      - ztnet_app-network
+
+  headplane:
+    image: ghcr.io/tale/headplane:0.7.1
+    container_name: headplane
+    restart: unless-stopped
+    volumes:
+      - /opt/headscale/headplane/config.yaml:/etc/headplane/config.yaml:ro,Z
+      - /opt/headscale/headplane/data:/var/lib/headplane:Z
+      - /opt/headscale/config:/etc/headscale:Z
+      - /run/podman/podman.sock:/var/run/docker.sock
+    networks:
+      - headscale-net
+
+networks:
+  headscale-net:
+    external: true
+  ztnet_app-network:
+    external: true
