@@ -7,7 +7,7 @@ server:
   # The base URL for Headplane. Please keep in mind that this will be required
   # for Headscale to properly function going forward AND it should not include
   # the dashboard prefix (/admin) portion.
-  base_url: "https://headplane.example.com"
+  # Set with HEADPLANE_SERVER__BASE_URL from the Compose environment.
 
   # The secret used to encode and decode web sessions (must be 32 characters)
   # You may also provide `cookie_secret_path` instead to read a value from disk.
@@ -106,7 +106,7 @@ headscale:
 
   # Optional, public URL if its different from the `headscale.url`
   # This affects certain parts of the web UI which shows Headscale's URL
-  public_url: "https://headscale.example.com"
+  # Set with HEADPLANE_HEADSCALE__PUBLIC_URL from the Compose environment.
 
   # Path to the Headscale configuration file
   # This is optional, but HIGHLY recommended for the best experience
@@ -176,7 +176,7 @@ integration:
     # automatically assign container names.
     #
     # If `container_name` is set, it will override any label checks.
-    container_name: "headscale"
+    # The target is selected using the label above.
 
     # The path to the Docker socket (do not change this if you are unsure)
     # Docker socket paths must start with unix:// or tcp:// and at the moment

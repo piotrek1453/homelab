@@ -9,7 +9,9 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
-      - internal
+      internal:
+        aliases:
+          - ztnet-db
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ztnet"]
       interval: 10s
@@ -51,7 +53,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       POSTGRES_DB: ztnet
-      NEXTAUTH_URL: "${NEXTAUTH_URL:-https://ztnet.example.com}"
+      NEXTAUTH_URL: "${ZTNET_SITE:?Set ZTNET_SITE in .env}"
       NEXTAUTH_SECRET: "${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET in .env}"
       NEXTAUTH_URL_INTERNAL: http://ztnet-app:3000
     networks:

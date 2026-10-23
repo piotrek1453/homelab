@@ -1,11 +1,32 @@
 services:
+  headscale-config:
+    image: docker.io/library/alpine:3.20
+    restart: "no"
+    environment:
+      HEADSCALE_SERVER_URL: "${HEADSCALE_SITE:?Set HEADSCALE_SITE in .env}"
+      HEADSCALE_DNS_BASE_DOMAIN: "${HEADSCALE_BASE_DOMAIN:?Set HEADSCALE_BASE_DOMAIN in .env}"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache gettext >/dev/null
+        envsubst '$$HEADSCALE_SERVER_URL $$HEADSCALE_DNS_BASE_DOMAIN' < /template/config.yaml > /rendered/config.yaml
+    volumes:
+      - ./config/config.yaml:/template/config.yaml:ro,Z
+      - headscale-config:/rendered:Z
+
   headscale:
     image: ghcr.io/juanfont/headscale:v0.29.4
     restart: unless-stopped
     command: serve
     user: "10001:10001"
+    depends_on:
+      headscale-config:
+        condition: service_completed_successfully
+    labels:
+      me.tale.headplane.target: headscale
     volumes:
-      - ./config:/etc/headscale:ro,Z
+      - headscale-config:/etc/headscale:ro,Z
       - headscale-data:/var/lib/headscale:Z
       - headscale-run:/var/run/headscale:Z
     networks:
@@ -26,12 +47,13 @@ services:
       headscale:
         condition: service_healthy
     environment:
-      HEADPLANE_LOAD_ENV_OVERRIDES: "true"
       HEADPLANE_SERVER__COOKIE_SECRET: "${HEADPLANE_COOKIE_SECRET:?Set HEADPLANE_COOKIE_SECRET in .env}"
+      HEADPLANE_SERVER__BASE_URL: "${HEADPLANE_SITE:?Set HEADPLANE_SITE in .env}"
+      HEADPLANE_HEADSCALE__PUBLIC_URL: "${HEADSCALE_SITE:?Set HEADSCALE_SITE in .env}"
     volumes:
       - ./headplane/config.yaml:/etc/headplane/config.yaml:ro,Z
       - headplane-data:/var/lib/headplane:Z
-      - ./config:/etc/headscale:Z
+      - headscale-config:/etc/headscale:ro,Z
       - ${CONTAINER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     networks:
       internal:
@@ -40,6 +62,7 @@ services:
       edge:
 
 volumes:
+  headscale-config:
   headscale-data:
   headscale-run:
   headplane-data:

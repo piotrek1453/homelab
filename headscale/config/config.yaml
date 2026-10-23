@@ -10,7 +10,7 @@
 #
 # https://myheadscale.example.com:443
 #
-server_url: https://headscale.example.com
+server_url: ${HEADSCALE_SERVER_URL}
 
 # Address to listen to / bind to on the server
 #
@@ -326,7 +326,7 @@ dns:
   # `base_domain` must be a FQDN, without the trailing dot.
   # The FQDN of the hosts will be
   # `hostname.base_domain` (e.g., _myhost.example.com_).
-  base_domain: tailnet.example.com
+  base_domain: ${HEADSCALE_DNS_BASE_DOMAIN}
 
   # Whether to use the local DNS settings of a node or override the local DNS
   # settings (default) and force the use of Headscale's DNS configuration.

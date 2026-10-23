@@ -13,6 +13,7 @@ env:
   NEXTAUTH_SECRET: ci-nextauth-secret-please-use-a-real-secret
   HEADPLANE_COOKIE_SECRET: ci-headplane-cookie-secret-ci-01
   HEADSCALE_SITE: http://headscale.test
+  HEADSCALE_BASE_DOMAIN: tailnet.test
   HEADPLANE_SITE: http://headplane.test
   ZTNET_SITE: http://ztnet.test
   CONTAINER_SOCKET: /run/podman/podman.sock
@@ -46,29 +47,43 @@ jobs:
 
       - name: Validate Compose files
         run: |
-          sudo -E podman compose -f caddy/compose.yaml config --quiet
-          sudo -E podman compose -f headscale/compose.yaml config --quiet
-          sudo -E podman compose -f ztnet/compose.yaml config --quiet
+          sudo -E podman-compose -f caddy/compose.yaml config --quiet
+          sudo -E podman-compose -f headscale/compose.yaml config --quiet
+          sudo -E podman-compose -f ztnet/compose.yaml config --quiet
 
       - name: Pull images
         run: |
-          sudo -E podman compose -p caddy -f caddy/compose.yaml pull
-          sudo -E podman compose -p headscale -f headscale/compose.yaml pull
-          sudo -E podman compose -p ztnet -f ztnet/compose.yaml pull
+          sudo -E podman-compose -p caddy -f caddy/compose.yaml pull
+          sudo -E podman-compose -p headscale -f headscale/compose.yaml pull
+          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml pull
 
       - name: Start application stacks
         run: |
-          sudo -E podman compose -p headscale -f headscale/compose.yaml up -d
-          sudo -E podman compose -p ztnet -f ztnet/compose.yaml up -d
-          sudo -E podman compose -p caddy -f caddy/compose.yaml up -d
+          sudo -E podman-compose -p headscale -f headscale/compose.yaml up -d
+          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml up -d
+          sudo -E podman-compose -p caddy -f caddy/compose.yaml up -d
 
       - name: Check container health and service routing
         run: |
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' caddy_caddy_1)" = healthy
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' headscale_headscale_1)" = healthy
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' headscale_headplane_1)" = healthy
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' ztnet_postgres_1)" = healthy
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' ztnet_ztnet_1)" = healthy
+          wait_healthy() {
+            container="$1"
+            for attempt in $(seq 1 60); do
+              status="$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' "$container" 2>/dev/null || true)"
+              case "$status" in
+                healthy) return 0 ;;
+                unhealthy|exited|dead) sudo podman logs "$container"; return 1 ;;
+              esac
+              sleep 1
+            done
+            sudo podman logs "$container"
+            echo "Timed out waiting for $container to become healthy"
+            return 1
+          }
+          wait_healthy caddy_caddy_1
+          wait_healthy headscale_headscale_1
+          wait_healthy headscale_headplane_1
+          wait_healthy ztnet_postgres_1
+          wait_healthy ztnet_ztnet_1
           check_route() {
             code="$(curl --silent --show-error --retry 12 --retry-delay 5 --output /dev/null --write-out '%{http_code}' -H "Host: $1" "http://127.0.0.1$2" || true)"
             case "$code" in
@@ -83,15 +98,15 @@ jobs:
       - name: Show diagnostics on failure
         if: failure()
         run: |
-          sudo -E podman compose -p caddy -f caddy/compose.yaml logs --no-color
-          sudo -E podman compose -p headscale -f headscale/compose.yaml logs --no-color
-          sudo -E podman compose -p ztnet -f ztnet/compose.yaml logs --no-color
+          sudo -E podman-compose -p caddy -f caddy/compose.yaml logs --no-color
+          sudo -E podman-compose -p headscale -f headscale/compose.yaml logs --no-color
+          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml logs --no-color
           sudo podman ps -a
 
       - name: Tear down stacks
         if: always()
         run: |
-          sudo -E podman compose -p caddy -f caddy/compose.yaml down --volumes --remove-orphans
-          sudo -E podman compose -p headscale -f headscale/compose.yaml down --volumes --remove-orphans
-          sudo -E podman compose -p ztnet -f ztnet/compose.yaml down --volumes --remove-orphans
+          sudo -E podman-compose -p caddy -f caddy/compose.yaml down --volumes --remove-orphans
+          sudo -E podman-compose -p headscale -f headscale/compose.yaml down --volumes --remove-orphans
+          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml down --volumes --remove-orphans
           sudo podman network rm edge || true
