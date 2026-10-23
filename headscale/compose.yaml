@@ -1,0 +1,51 @@
+services:
+  headscale:
+    image: ghcr.io/juanfont/headscale:v0.29.4
+    restart: unless-stopped
+    command: serve
+    user: "10001:10001"
+    volumes:
+      - ./config:/etc/headscale:ro,Z
+      - headscale-data:/var/lib/headscale:Z
+      - headscale-run:/var/run/headscale:Z
+    networks:
+      internal:
+        aliases:
+          - headscale-api
+      edge:
+    healthcheck:
+      test: ["CMD", "headscale", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  headplane:
+    image: ghcr.io/tale/headplane:0.7.1
+    restart: unless-stopped
+    depends_on:
+      headscale:
+        condition: service_healthy
+    environment:
+      HEADPLANE_LOAD_ENV_OVERRIDES: "true"
+      HEADPLANE_SERVER__COOKIE_SECRET: "${HEADPLANE_COOKIE_SECRET:?Set HEADPLANE_COOKIE_SECRET in .env}"
+    volumes:
+      - ./headplane/config.yaml:/etc/headplane/config.yaml:ro,Z
+      - headplane-data:/var/lib/headplane:Z
+      - ./config:/etc/headscale:Z
+      - ${CONTAINER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    networks:
+      internal:
+        aliases:
+          - headplane-ui
+      edge:
+
+volumes:
+  headscale-data:
+  headscale-run:
+  headplane-data:
+
+networks:
+  internal:
+  edge:
+    external: true
+    name: edge

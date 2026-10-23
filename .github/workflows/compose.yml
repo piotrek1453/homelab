@@ -1,0 +1,97 @@
+name: Compose validation
+
+"on":
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  COMPOSE_PARALLEL_LIMIT: 1
+  POSTGRES_PASSWORD: ci-postgres-password
+  NEXTAUTH_SECRET: ci-nextauth-secret-please-use-a-real-secret
+  HEADPLANE_COOKIE_SECRET: ci-headplane-cookie-secret-ci-01
+  HEADSCALE_SITE: http://headscale.test
+  HEADPLANE_SITE: http://headplane.test
+  ZTNET_SITE: http://ztnet.test
+  CONTAINER_SOCKET: /run/podman/podman.sock
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Compose dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes podman podman-compose
+
+      - name: Start rootful Podman API
+        run: |
+          sudo mkdir -p /run/podman
+          sudo podman system service --time=0 unix:///run/podman/podman.sock >/tmp/podman-api.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            sudo test -S /run/podman/podman.sock && exit 0
+            sleep 1
+          done
+          sudo cat /tmp/podman-api.log
+          exit 1
+
+      - name: Create shared edge network
+        run: sudo podman network create edge
+
+      - name: Validate Compose files
+        run: |
+          sudo -E podman compose -f caddy/compose.yaml config --quiet
+          sudo -E podman compose -f headscale/compose.yaml config --quiet
+          sudo -E podman compose -f ztnet/compose.yaml config --quiet
+
+      - name: Pull images
+        run: |
+          sudo -E podman compose -p caddy -f caddy/compose.yaml pull
+          sudo -E podman compose -p headscale -f headscale/compose.yaml pull
+          sudo -E podman compose -p ztnet -f ztnet/compose.yaml pull
+
+      - name: Start application stacks
+        run: |
+          sudo -E podman compose -p headscale -f headscale/compose.yaml up -d
+          sudo -E podman compose -p ztnet -f ztnet/compose.yaml up -d
+          sudo -E podman compose -p caddy -f caddy/compose.yaml up -d
+
+      - name: Check container health and service routing
+        run: |
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' caddy_caddy_1)" = healthy
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' headscale_headscale_1)" = healthy
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' headscale_headplane_1)" = healthy
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' ztnet_postgres_1)" = healthy
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' ztnet_ztnet_1)" = healthy
+          check_route() {
+            code="$(curl --silent --show-error --retry 12 --retry-delay 5 --output /dev/null --write-out '%{http_code}' -H "Host: $1" "http://127.0.0.1$2" || true)"
+            case "$code" in
+              2*|3*) return 0 ;;
+              *) echo "Unexpected response from $1$2: $code"; return 1 ;;
+            esac
+          }
+          check_route headscale.test /version
+          check_route headplane.test /admin/
+          check_route ztnet.test /api/auth/session
+
+      - name: Show diagnostics on failure
+        if: failure()
+        run: |
+          sudo -E podman compose -p caddy -f caddy/compose.yaml logs --no-color
+          sudo -E podman compose -p headscale -f headscale/compose.yaml logs --no-color
+          sudo -E podman compose -p ztnet -f ztnet/compose.yaml logs --no-color
+          sudo podman ps -a
+
+      - name: Tear down stacks
+        if: always()
+        run: |
+          sudo -E podman compose -p caddy -f caddy/compose.yaml down --volumes --remove-orphans
+          sudo -E podman compose -p headscale -f headscale/compose.yaml down --volumes --remove-orphans
+          sudo -E podman compose -p ztnet -f ztnet/compose.yaml down --volumes --remove-orphans
+          sudo podman network rm edge || true

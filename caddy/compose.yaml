@@ -1,0 +1,34 @@
+services:
+  caddy:
+    image: docker.io/library/caddy:2.10.2
+    restart: unless-stopped
+    environment:
+      HEADSCALE_SITE: "${HEADSCALE_SITE:-https://headscale.example.com}"
+      HEADPLANE_SITE: "${HEADPLANE_SITE:-https://headplane.example.com}"
+      ZTNET_SITE: "${ZTNET_SITE:-https://ztnet.example.com}"
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,Z
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      edge:
+        aliases:
+          - caddy
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  edge:
+    external: true
+    name: edge
