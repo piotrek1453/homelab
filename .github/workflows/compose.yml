@@ -64,11 +64,11 @@ jobs:
 
       - name: Check container health and service routing
         run: |
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' caddy_caddy_1)" = healthy
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' headscale_headscale_1)" = healthy
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' headscale_headplane_1)" = healthy
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' ztnet_postgres_1)" = healthy
-          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' ztnet_ztnet_1)" = healthy
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' caddy-caddy-1)" = healthy
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' headscale-headscale-1)" = healthy
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' headscale-headplane-1)" = healthy
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' ztnet-postgres-1)" = healthy
+          test "$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' ztnet-ztnet-1)" = healthy
           check_route() {
             code="$(curl --silent --show-error --retry 12 --retry-delay 5 --output /dev/null --write-out '%{http_code}' -H "Host: $1" "http://127.0.0.1$2" || true)"
             case "$code" in
