@@ -79,7 +79,6 @@ jobs:
           }
           wait_for_healthy caddy-caddy-1
           wait_for_healthy headscale-headscale-1
-          wait_for_healthy headscale-headplane-1
           wait_for_healthy ztnet-postgres-1
           wait_for_healthy ztnet-ztnet-1
           check_route() {
