@@ -12,10 +12,6 @@ env:
   POSTGRES_PASSWORD: ci-postgres-password
   NEXTAUTH_SECRET: ci-nextauth-secret-please-use-a-real-secret
   HEADPLANE_COOKIE_SECRET: ci-headplane-cookie-secret-ci-01
-  HEADSCALE_SITE: http://headscale.test
-  HEADSCALE_BASE_DOMAIN: tailnet.test
-  HEADPLANE_SITE: http://headplane.test
-  ZTNET_SITE: http://ztnet.test
   CONTAINER_SOCKET: /run/podman/podman.sock
 
 jobs:
@@ -47,9 +43,9 @@ jobs:
 
       - name: Validate Compose files
         run: |
-          sudo -E podman-compose -f caddy/compose.yaml config --quiet
-          sudo -E podman-compose -f headscale/compose.yaml config --quiet
-          sudo -E podman-compose -f ztnet/compose.yaml config --quiet
+          sudo -E podman-compose -f caddy/compose.yaml config >/dev/null
+          sudo -E podman-compose -f headscale/compose.yaml config >/dev/null
+          sudo -E podman-compose -f ztnet/compose.yaml config >/dev/null
 
       - name: Pull images
         run: |
@@ -91,16 +87,16 @@ jobs:
               *) echo "Unexpected response from $1$2: $code"; return 1 ;;
             esac
           }
-          check_route headscale.test /version
-          check_route headplane.test /admin/
-          check_route ztnet.test /api/auth/session
+          check_route headscale.cdreamz.duckdns.org /version
+          check_route headplane.cdreamz.duckdns.org /admin/
+          check_route ztnet.cdreamz.duckdns.org /api/auth/session
 
       - name: Show diagnostics on failure
         if: failure()
         run: |
-          sudo -E podman-compose -p caddy -f caddy/compose.yaml logs --no-color
-          sudo -E podman-compose -p headscale -f headscale/compose.yaml logs --no-color
-          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml logs --no-color
+          sudo -E podman-compose -p caddy -f caddy/compose.yaml logs || true
+          sudo -E podman-compose -p headscale -f headscale/compose.yaml logs || true
+          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml logs || true
           sudo podman ps -a
 
       - name: Tear down stacks

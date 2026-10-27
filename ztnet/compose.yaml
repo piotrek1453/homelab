@@ -53,7 +53,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       POSTGRES_DB: ztnet
-      NEXTAUTH_URL: "${ZTNET_SITE:?Set ZTNET_SITE in .env}"
+      NEXTAUTH_URL: https://ztnet.cdreamz.duckdns.org
       NEXTAUTH_SECRET: "${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET in .env}"
       NEXTAUTH_URL_INTERNAL: http://ztnet-app:3000
     networks:

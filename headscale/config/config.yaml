@@ -8,9 +8,9 @@
 # The url clients will connect to.
 # Typically this will be a domain like:
 #
-# https://myheadscale.example.com:443
+# https://headscale.cdreamz.duckdns.org
 #
-server_url: ${HEADSCALE_SERVER_URL}
+server_url: https://headscale.cdreamz.duckdns.org
 
 # Address to listen to / bind to on the server
 #
@@ -123,8 +123,8 @@ derp:
 
     # For better connection stability (especially when using an Exit-Node and DNS is not working),
     # it is possible to optionally add the public IPv4 and IPv6 address to the Derp-Map using:
-    ipv4: 198.51.100.1
-    ipv6: 2001:db8::1
+    ipv4: ""
+    ipv6: ""
 
   # List of externally available DERP maps encoded in JSON
   urls:
@@ -326,7 +326,7 @@ dns:
   # `base_domain` must be a FQDN, without the trailing dot.
   # The FQDN of the hosts will be
   # `hostname.base_domain` (e.g., _myhost.example.com_).
-  base_domain: ${HEADSCALE_DNS_BASE_DOMAIN}
+  base_domain: tailnet.cdreamz.duckdns.org
 
   # Whether to use the local DNS settings of a node or override the local DNS
   # settings (default) and force the use of Headscale's DNS configuration.

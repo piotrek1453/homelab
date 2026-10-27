@@ -7,7 +7,7 @@ server:
   # The base URL for Headplane. Please keep in mind that this will be required
   # for Headscale to properly function going forward AND it should not include
   # the dashboard prefix (/admin) portion.
-  # Set with HEADPLANE_SERVER__BASE_URL from the Compose environment.
+  base_url: "https://headplane.cdreamz.duckdns.org"
 
   # The secret used to encode and decode web sessions (must be 32 characters)
   # You may also provide `cookie_secret_path` instead to read a value from disk.
@@ -106,7 +106,7 @@ headscale:
 
   # Optional, public URL if its different from the `headscale.url`
   # This affects certain parts of the web UI which shows Headscale's URL
-  # Set with HEADPLANE_HEADSCALE__PUBLIC_URL from the Compose environment.
+  public_url: "https://headscale.cdreamz.duckdns.org"
 
   # Path to the Headscale configuration file
   # This is optional, but HIGHLY recommended for the best experience
