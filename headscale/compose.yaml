@@ -16,17 +16,14 @@ services:
           - headscale-api
       edge:
     healthcheck:
-      test: ["CMD", "headscale", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      disable: true
 
   headplane:
     image: ghcr.io/tale/headplane:0.7.1
     restart: unless-stopped
     depends_on:
       headscale:
-        condition: service_healthy
+        condition: service_started
     environment:
       HEADPLANE_SERVER__COOKIE_SECRET: "${HEADPLANE_COOKIE_SECRET:?Set HEADPLANE_COOKIE_SECRET in .env}"
     volumes:

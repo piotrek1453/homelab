@@ -104,7 +104,9 @@ can succeed. Public URL overrides in `.env` are no longer supported.
 
 ```sh
 cd /opt/homelab
-podman-compose -p headscale -f headscale/compose.yaml up -d
+podman-compose -p headscale -f headscale/compose.yaml up -d headscale
+for attempt in $(seq 1 60); do podman exec headscale_headscale_1 headscale health >/dev/null 2>&1 && break; sleep 1; done
+podman exec headscale_headscale_1 headscale health && podman-compose -p headscale -f headscale/compose.yaml up -d headplane
 podman-compose -p ztnet -f ztnet/compose.yaml up -d
 podman-compose -p caddy -f caddy/compose.yaml up -d
 
@@ -190,7 +192,9 @@ assuming that a volume with the same name belongs to the same storage root.
 
 ```sh
 cd /opt/homelab
-podman-compose -p headscale -f headscale/compose.yaml up -d
+podman-compose -p headscale -f headscale/compose.yaml up -d headscale
+for attempt in $(seq 1 60); do podman exec headscale_headscale_1 headscale health >/dev/null 2>&1 && break; sleep 1; done
+podman exec headscale_headscale_1 headscale health && podman-compose -p headscale -f headscale/compose.yaml up -d headplane
 podman-compose -p ztnet -f ztnet/compose.yaml up -d
 podman-compose -p caddy -f caddy/compose.yaml up -d
 podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
@@ -213,7 +217,8 @@ Update one stack at a time. Never remove named volumes unless their data has
 been backed up and removal is intentional.
 
 The GitHub Actions workflow validates all Compose files, pulls the images,
-starts every stack with rootful Podman, checks healthchecks, and tests all
-three Caddy routes. Its Compose commands are compatible with Ubuntu's
+checks Headscale's gRPC health through `podman exec`, starts the remaining
+services, checks their healthchecks, and tests all three Caddy routes. Its
+Compose commands are compatible with Ubuntu's
 `podman-compose` package, which does not support Docker Compose's
 `--quiet` and `--no-color` options.

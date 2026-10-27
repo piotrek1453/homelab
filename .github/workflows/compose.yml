@@ -38,14 +38,14 @@ jobs:
           sudo cat /tmp/podman-api.log
           exit 1
 
-      - name: Create shared edge network
-        run: sudo podman network create edge
-
       - name: Validate Compose files
         run: |
           sudo -E podman-compose -f caddy/compose.yaml config >/dev/null
           sudo -E podman-compose -f headscale/compose.yaml config >/dev/null
           sudo -E podman-compose -f ztnet/compose.yaml config >/dev/null
+
+      - name: Create shared edge network
+        run: sudo podman network create edge
 
       - name: Pull images
         run: |
@@ -53,9 +53,23 @@ jobs:
           sudo -E podman-compose -p headscale -f headscale/compose.yaml pull
           sudo -E podman-compose -p ztnet -f ztnet/compose.yaml pull
 
+      - name: Start Headscale and wait for gRPC health
+        run: |
+          sudo -E podman-compose -p headscale -f headscale/compose.yaml up -d headscale
+          for attempt in $(seq 1 60); do
+            if sudo podman exec headscale_headscale_1 headscale health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          sudo podman exec headscale_headscale_1 headscale health || true
+          sudo podman logs headscale_headscale_1
+          echo "Timed out waiting for Headscale gRPC health"
+          exit 1
+
       - name: Start application stacks
         run: |
-          sudo -E podman-compose -p headscale -f headscale/compose.yaml up -d
+          sudo -E podman-compose -p headscale -f headscale/compose.yaml up -d headplane
           sudo -E podman-compose -p ztnet -f ztnet/compose.yaml up -d
           sudo -E podman-compose -p caddy -f caddy/compose.yaml up -d
 
@@ -76,7 +90,6 @@ jobs:
             return 1
           }
           wait_healthy caddy_caddy_1
-          wait_healthy headscale_headscale_1
           wait_healthy headscale_headplane_1
           wait_healthy ztnet_postgres_1
           wait_healthy ztnet_ztnet_1
