@@ -64,7 +64,7 @@ jobs:
           wait_healthy() {
             container="$1"
             for attempt in $(seq 1 60); do
-              status="$(sudo podman inspect --format='{{.State.Healthcheck.Status}}' "$container" 2>/dev/null || true)"
+              status="$(sudo podman inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
               case "$status" in
                 healthy) return 0 ;;
                 unhealthy|exited|dead) sudo podman logs "$container"; return 1 ;;
