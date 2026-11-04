@@ -1,0 +1,24 @@
+[Unit]
+Description=Homelab rootless Podman Compose stacks
+Wants=network-online.target
+After=network-online.target podman.socket
+Requires=podman.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h/homelab
+EnvironmentFile=%h/homelab/.env
+Environment=CONTAINER_SOCKET=%t/podman/podman.sock
+ExecStartPre=/usr/bin/podman network create --ignore edge
+ExecStart=/usr/bin/podman-compose -p headscale -f headscale/compose.yaml up -d
+ExecStart=/usr/bin/podman-compose -p ztnet -f ztnet/compose.yaml up -d
+ExecStart=/usr/bin/podman-compose -p caddy -f caddy/compose.yaml up -d
+ExecStop=/usr/bin/podman-compose -p caddy -f caddy/compose.yaml stop
+ExecStop=/usr/bin/podman-compose -p ztnet -f ztnet/compose.yaml stop
+ExecStop=/usr/bin/podman-compose -p headscale -f headscale/compose.yaml stop
+TimeoutStartSec=0
+TimeoutStopSec=180
+
+[Install]
+WantedBy=default.target

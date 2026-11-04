@@ -1,6 +1,6 @@
 services:
   caddy:
-    image: docker.io/library/caddy:2.10.2
+    image: docker.io/library/caddy:2.11.7
     restart: unless-stopped
     ports:
       - "80:80/tcp"
@@ -8,8 +8,8 @@ services:
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro,Z
-      - caddy-data:/data
-      - caddy-config:/config
+      - caddy-data:/data:Z
+      - caddy-config:/config:Z
     networks:
       edge:
         aliases:

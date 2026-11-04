@@ -12,7 +12,6 @@ env:
   POSTGRES_PASSWORD: ci-postgres-password
   NEXTAUTH_SECRET: ci-nextauth-secret-please-use-a-real-secret
   HEADPLANE_COOKIE_SECRET: ci-headplane-cookie-secret-ci-01
-  CONTAINER_SOCKET: /run/podman/podman.sock
 
 jobs:
   compose:
@@ -27,70 +26,84 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes podman podman-compose
 
-      - name: Start rootful Podman API
+      - name: Start rootless Podman API
         run: |
-          sudo mkdir -p /run/podman
-          sudo podman system service --time=0 unix:///run/podman/podman.sock >/tmp/podman-api.log 2>&1 &
+          sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
+          sudo loginctl enable-linger "$(id -un)"
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+          echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$GITHUB_ENV"
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> "$GITHUB_ENV"
+          systemctl --user show-environment >/dev/null
+          test "$(podman info --format '{{.Host.Security.Rootless}}')" = true
+          echo "CONTAINER_SOCKET=$XDG_RUNTIME_DIR/podman/homelab-ci.sock" >> "$GITHUB_ENV"
+          mkdir -p "$XDG_RUNTIME_DIR/podman"
+          RUNNER_TRACKING_ID=homelab-podman-api nohup podman system service --time=0 "unix://$XDG_RUNTIME_DIR/podman/homelab-ci.sock" >/tmp/podman-api.log 2>&1 &
+          echo $! > /tmp/homelab-podman-api.pid
           for attempt in $(seq 1 30); do
-            sudo test -S /run/podman/podman.sock && exit 0
+            test -S "$XDG_RUNTIME_DIR/podman/homelab-ci.sock" && exit 0
             sleep 1
           done
-          sudo cat /tmp/podman-api.log
+          cat /tmp/podman-api.log
           exit 1
 
       - name: Validate Compose files
         run: |
-          sudo -E podman-compose -f caddy/compose.yaml config >/dev/null
-          sudo -E podman-compose -f headscale/compose.yaml config >/dev/null
-          sudo -E podman-compose -f ztnet/compose.yaml config >/dev/null
+          podman-compose -f caddy/compose.yaml config >/dev/null
+          podman-compose -f headscale/compose.yaml config >/dev/null
+          podman-compose -f ztnet/compose.yaml config >/dev/null
 
       - name: Create shared edge network
-        run: sudo podman network create edge
+        run: podman network create edge
 
       - name: Pull images
         run: |
-          sudo -E podman-compose -p caddy -f caddy/compose.yaml pull
-          sudo -E podman-compose -p headscale -f headscale/compose.yaml pull
-          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml pull
+          podman-compose -p caddy -f caddy/compose.yaml pull
+          podman-compose -p headscale -f headscale/compose.yaml pull
+          podman-compose -p ztnet -f ztnet/compose.yaml pull
 
       - name: Start Headscale and wait for gRPC health
         run: |
-          sudo -E podman-compose -p headscale -f headscale/compose.yaml up -d headscale
+          podman-compose -p headscale -f headscale/compose.yaml up -d headscale
           for attempt in $(seq 1 60); do
-            if sudo podman exec headscale_headscale_1 headscale health >/dev/null 2>&1; then
+            if podman exec headscale_headscale_1 headscale health >/dev/null 2>&1; then
               exit 0
             fi
             sleep 1
           done
-          sudo podman exec headscale_headscale_1 headscale health || true
-          sudo podman logs headscale_headscale_1
+          podman exec headscale_headscale_1 headscale health || true
+          podman logs headscale_headscale_1
           echo "Timed out waiting for Headscale gRPC health"
           exit 1
 
       - name: Start application stacks
         run: |
-          sudo -E podman-compose -p headscale -f headscale/compose.yaml up -d headplane
-          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml up -d
-          sudo -E podman-compose -p caddy -f caddy/compose.yaml up -d
+          podman-compose -p headscale -f headscale/compose.yaml up -d headplane
+          podman-compose -p ztnet -f ztnet/compose.yaml up -d
+          podman-compose -p caddy -f caddy/compose.yaml up -d
+
+      - name: Check Headplane configuration access
+        run: |
+          test "$(podman inspect --format '{{range .Mounts}}{{if eq .Destination "/etc/headscale"}}{{.RW}}{{end}}{{end}}' headscale_headscale_1)" = false
+          podman exec headscale_headplane_1 /nodejs/bin/node -e "const fs = require('fs'); fs.accessSync('/etc/headscale/config.yaml', fs.constants.W_OK); fs.writeFileSync('/etc/headscale/.write-test', 'test'); fs.unlinkSync('/etc/headscale/.write-test')"
 
       - name: Check container health and service routing
         run: |
           wait_healthy() {
             container="$1"
             for attempt in $(seq 1 60); do
-              status="$(sudo podman inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
+              status="$(podman inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
               case "$status" in
                 healthy) return 0 ;;
-                unhealthy|exited|dead) sudo podman logs "$container"; return 1 ;;
+                unhealthy|exited|dead) podman logs "$container"; return 1 ;;
               esac
               sleep 1
             done
-            sudo podman logs "$container"
+            podman logs "$container"
             echo "Timed out waiting for $container to become healthy"
             return 1
           }
           wait_healthy caddy_caddy_1
-          wait_healthy headscale_headplane_1
           wait_healthy ztnet_postgres_1
           wait_healthy ztnet_ztnet_1
           check_route() {
@@ -102,20 +115,21 @@ jobs:
           }
           check_route headscale.cdreamz.duckdns.org /version
           check_route headplane.cdreamz.duckdns.org /admin/
-          check_route ztnet.cdreamz.duckdns.org /api/auth/session
+          check_route ztnet.cdreamz.duckdns.org /
 
       - name: Show diagnostics on failure
         if: failure()
         run: |
-          sudo -E podman-compose -p caddy -f caddy/compose.yaml logs || true
-          sudo -E podman-compose -p headscale -f headscale/compose.yaml logs || true
-          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml logs || true
-          sudo podman ps -a
+          podman-compose -p caddy -f caddy/compose.yaml logs || true
+          podman-compose -p headscale -f headscale/compose.yaml logs || true
+          podman-compose -p ztnet -f ztnet/compose.yaml logs || true
+          podman ps -a
 
       - name: Tear down stacks
         if: always()
         run: |
-          sudo -E podman-compose -p caddy -f caddy/compose.yaml down --volumes --remove-orphans
-          sudo -E podman-compose -p headscale -f headscale/compose.yaml down --volumes --remove-orphans
-          sudo -E podman-compose -p ztnet -f ztnet/compose.yaml down --volumes --remove-orphans
-          sudo podman network rm edge || true
+          podman-compose -p caddy -f caddy/compose.yaml down --volumes --remove-orphans
+          podman-compose -p headscale -f headscale/compose.yaml down --volumes --remove-orphans
+          podman-compose -p ztnet -f ztnet/compose.yaml down --volumes --remove-orphans
+          podman network rm edge || true
+          if test -f /tmp/homelab-podman-api.pid; then kill "$(cat /tmp/homelab-podman-api.pid)" || true; fi

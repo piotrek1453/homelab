@@ -293,7 +293,7 @@ log:
 policy:
   # The mode can be "file" or "database" that defines
   # where the policies are stored and read from.
-  mode: file
+  mode: database
   # If the mode is set to "file", the path to a HuJSON file containing policies.
   path: ""
 
