@@ -49,22 +49,22 @@ jobs:
 
       - name: Validate Compose files
         run: |
-          podman-compose -f caddy/compose.yaml config >/dev/null
-          podman-compose -f headscale/compose.yaml config >/dev/null
-          podman-compose -f ztnet/compose.yaml config >/dev/null
+          printf 'POSTGRES_PASSWORD=%s\nNEXTAUTH_SECRET=%s\nHEADPLANE_COOKIE_SECRET=%s\nCONTAINER_SOCKET=%s\n' \
+            "$POSTGRES_PASSWORD" "$NEXTAUTH_SECRET" "$HEADPLANE_COOKIE_SECRET" "$CONTAINER_SOCKET" > .env
+          chmod 600 .env
+          make config
 
       - name: Create shared edge network
-        run: podman network create edge
+        run: make network
 
       - name: Pull images
-        run: |
-          podman-compose -p caddy -f caddy/compose.yaml pull
-          podman-compose -p headscale -f headscale/compose.yaml pull
-          podman-compose -p ztnet -f ztnet/compose.yaml pull
+        run: make pull
 
-      - name: Start Headscale and wait for gRPC health
+      - name: Start stacks
+        run: make up
+
+      - name: Verify Headscale socket and gRPC health
         run: |
-          podman-compose -p headscale -f headscale/compose.yaml up -d headscale
           for attempt in $(seq 1 60); do
             if podman exec headscale_headscale_1 headscale health >/dev/null 2>&1; then
               exit 0
@@ -76,11 +76,14 @@ jobs:
           echo "Timed out waiting for Headscale gRPC health"
           exit 1
 
-      - name: Start application stacks
+      - name: Verify network isolation and Headscale runtime permissions
         run: |
-          podman-compose -p headscale -f headscale/compose.yaml up -d headplane
-          podman-compose -p ztnet -f ztnet/compose.yaml up -d
-          podman-compose -p caddy -f caddy/compose.yaml up -d
+          podman network exists edge
+          podman network exists headscale_internal
+          podman network exists ztnet_internal
+          test "$(podman exec headscale_headscale_1 id -u)" = 10001
+          podman exec headscale_headscale_1 test -w /var/run/headscale
+          podman exec headscale_headscale_1 test -S /var/run/headscale/headscale.sock
 
       - name: Check Headplane configuration access
         run: |
@@ -128,6 +131,7 @@ jobs:
       - name: Tear down stacks
         if: always()
         run: |
+          make down || true
           podman-compose -p caddy -f caddy/compose.yaml down --volumes --remove-orphans
           podman-compose -p headscale -f headscale/compose.yaml down --volumes --remove-orphans
           podman-compose -p ztnet -f ztnet/compose.yaml down --volumes --remove-orphans

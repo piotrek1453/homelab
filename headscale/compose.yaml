@@ -9,7 +9,7 @@ services:
     volumes:
       - ./config:/etc/headscale:ro,z
       - headscale-data:/var/lib/headscale:Z
-      - headscale-run:/var/run/headscale:Z
+      - headscale-run:/var/run/headscale:Z,U
     networks:
       internal:
         aliases:
@@ -46,6 +46,7 @@ volumes:
 
 networks:
   internal:
+    name: headscale_internal
   edge:
     external: true
     name: edge

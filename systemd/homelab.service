@@ -10,13 +10,9 @@ RemainAfterExit=yes
 WorkingDirectory=%h/homelab
 EnvironmentFile=%h/homelab/.env
 Environment=CONTAINER_SOCKET=%t/podman/podman.sock
-ExecStartPre=/usr/bin/podman network create --ignore edge
-ExecStart=/usr/bin/podman-compose -p headscale -f headscale/compose.yaml up -d
-ExecStart=/usr/bin/podman-compose -p ztnet -f ztnet/compose.yaml up -d
-ExecStart=/usr/bin/podman-compose -p caddy -f caddy/compose.yaml up -d
-ExecStop=/usr/bin/podman-compose -p caddy -f caddy/compose.yaml stop
-ExecStop=/usr/bin/podman-compose -p ztnet -f ztnet/compose.yaml stop
-ExecStop=/usr/bin/podman-compose -p headscale -f headscale/compose.yaml stop
+ExecStart=/usr/bin/make network
+ExecStart=/usr/bin/make up
+ExecStop=/usr/bin/make down
 TimeoutStartSec=0
 TimeoutStopSec=180
 
