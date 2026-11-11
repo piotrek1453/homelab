@@ -1,13 +1,14 @@
 headscale.cdreamz.duckdns.org {
-    reverse_proxy headscale-api:8080
+    reverse_proxy headscale:8080
 }
 
 headplane.cdreamz.duckdns.org {
     @root path /
     redir @root /admin/ 302
-    reverse_proxy headplane-ui:3000
+    reverse_proxy headplane:3000
 }
 
 ztnet.cdreamz.duckdns.org {
-    reverse_proxy ztnet-app:3000
+    reverse_proxy ztnet:3000
 }
+
