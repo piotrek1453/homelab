@@ -81,9 +81,9 @@ jobs:
           podman network exists edge
           podman network exists headscale_internal
           podman network exists ztnet_internal
-          test "$(podman exec headscale_headscale_1 id -u)" = 10001
-          podman exec headscale_headscale_1 test -w /var/run/headscale
-          podman exec headscale_headscale_1 test -S /var/run/headscale/headscale.sock
+          test "$(podman inspect --format '{{.Config.User}}' headscale_headscale_1)" = "10001:10001"
+          runtime_mount="$(podman volume inspect --format '{{.Mountpoint}}' headscale_headscale-run)"
+          test "$(podman unshare stat -c '%u:%g' "$runtime_mount")" = "10001:10001"
 
       - name: Check Headplane configuration access
         run: |
