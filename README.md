@@ -11,9 +11,9 @@ The [Makefile](./Makefile) is the central management mechanism.
 
 ## Network architecture
 
-`edge` is a shared external Podman network. Caddy and the public-facing
-services are attached to it, allowing Caddy to use the service names
-`headscale`, `headplane`, and `ztnet` as backends.
+`edge` is a shared external Podman network. Caddy and the public-facing services
+are attached to it, allowing Caddy to use the service names `headscale`,
+`headplane`, and `ztnet` as backends.
 
 Internal traffic is isolated:
 
@@ -81,10 +81,10 @@ make up
 make status
 ```
 
-`make network` is safe to repeat and creates `edge` if it does not exist. Do
-not remove volumes during initial setup or upgrades. Before exposing the
-services, configure DNS for the names in the [Caddyfile](./caddy/Caddyfile)
-and restrict administrative access to Headplane and ZTNet with firewall rules.
+`make network` is safe to repeat and creates `edge` if it does not exist. Do not
+remove volumes during initial setup or upgrades. Before exposing the services,
+configure DNS for the names in the [Caddyfile](./caddy/Caddyfile) and restrict
+administrative access to Headplane and ZTNet with firewall rules.
 
 Startup order is fixed: Headscale/Headplane first, then ZTNet, and Caddy last.
 Shutdown happens in reverse order. The user service
@@ -102,24 +102,23 @@ systemctl --user enable --now homelab.service
 
 Run these commands from the repository root as the rootless user:
 
-| Command | Description |
-| --- | --- |
-| `make network` | Create the shared `edge` network if it does not exist. |
-| `make config` | Validate interpolation and syntax for all Compose files. |
-| `make up` | Start all stacks in the required order. |
-| `make down` | Stop Caddy, then ZTNet, then Headscale. |
-| `make restart` | Run `down`, followed by `up`. |
-| `make status` | Show the status of containers in all projects. |
-| `make logs` | Show the last 100 log lines for each project. |
-| `make pull` | Pull the image tags declared in Compose. |
-| `make update` | Run backup, `pull`, and restart the stacks. |
-| `make backup` | Stop the stacks, archive the repository and volumes, verify the archives, and start the stacks again. |
+| Command        | Description                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------------- |
+| `make network` | Create the shared `edge` network if it does not exist.                                                |
+| `make config`  | Validate interpolation and syntax for all Compose files.                                              |
+| `make up`      | Start all stacks in the required order.                                                               |
+| `make down`    | Stop Caddy, then ZTNet, then Headscale.                                                               |
+| `make restart` | Run `down`, followed by `up`.                                                                         |
+| `make status`  | Show the status of containers in all projects.                                                        |
+| `make logs`    | Show the last 100 log lines for each project.                                                         |
+| `make pull`    | Pull the image tags declared in Compose.                                                              |
+| `make update`  | Run backup, `pull`, and restart the stacks.                                                           |
+| `make backup`  | Stop the stacks, archive the repository and volumes, verify the archives, and start the stacks again. |
 
 `make update` does not select newer image versions and does not perform
-PostgreSQL migrations. Change image tags manually after reviewing the
-vendor's release notes, make a backup, and then run `make update`. Backups
-contain secrets and authentication data; set `BACKUP_ROOT` to choose another
-location:
+PostgreSQL migrations. Change image tags manually after reviewing the vendor's
+release notes, make a backup, and then run `make update`. Backups contain
+secrets and authentication data; set `BACKUP_ROOT` to choose another location:
 
 ```sh
 BACKUP_ROOT="$HOME/homelab-backups" make backup
@@ -127,8 +126,7 @@ BACKUP_ROOT="$HOME/homelab-backups" make backup
 
 ## Migration from the previous configuration
 
-1. Stop the previous service:
-   `systemctl --user stop homelab.service`.
+1. Stop the previous service: `systemctl --user stop homelab.service`.
 2. Create and verify a backup. Do not use `down -v`, `podman volume prune`, or
    remove data volumes.
 3. Update the repository and copy `.env`, preserving local Headscale
@@ -138,10 +136,10 @@ BACKUP_ROOT="$HOME/homelab-backups" make backup
 6. Verify `make status`, logs, Headplane and ZTNet logins, existing Headscale
    nodes, and ZeroTier networks.
 
-On the first startup after this change, Compose may create
-`headscale_internal` and `ztnet_internal`. These are network metadata only;
-Headscale SQLite data, Headplane data, PostgreSQL data, and the ZeroTier
-identity remain in their existing volumes.
+On the first startup after this change, Compose may create `headscale_internal`
+and `ztnet_internal`. These are network metadata only; Headscale SQLite data,
+Headplane data, PostgreSQL data, and the ZeroTier identity remain in their
+existing volumes.
 
 ## Headscale troubleshooting
 
@@ -163,8 +161,8 @@ Internet.
 The `bind: permission denied` error was caused by the combination of
 `user: "10001:10001"` and a named volume mounted without changing its owner.
 Rootless Podman creates an empty volume directory as `root:root` with mode
-`0755`; the `:Z` label fixes SELinux labeling but not POSIX permissions.
-The `headscale-run:/var/run/headscale:Z,U` mount changes ownership of this
+`0755`; the `:Z` label fixes SELinux labeling but not POSIX permissions. The
+`headscale-run:/var/run/headscale:Z,U` mount changes ownership of this
 runtime-only volume to the process UID. It does not change the data volume or
 run Headscale as root.
 
@@ -182,12 +180,11 @@ sudo ausearch -m AVC -ts recent
 podman logs headscale_headscale_1
 ```
 
-The expected process UID/GID is `10001:10001`, and the runtime directory must
-be writable by that UID. If the host path, SELinux label, or an existing
-socket is incorrect, first stop the stack with `make down` and inspect the
-specific volume. Do not remove `headscale-data` or the SQLite database. Only
-remove the socket after confirming that it is not in use; `make up` will
-recreate it.
+The expected process UID/GID is `10001:10001`, and the runtime directory must be
+writable by that UID. If the host path, SELinux label, or an existing socket is
+incorrect, first stop the stack with `make down` and inspect the specific
+volume. Do not remove `headscale-data` or the SQLite database. Only remove the
+socket after confirming that it is not in use; `make up` will recreate it.
 
 ### Caddy and backend connectivity
 
@@ -205,10 +202,10 @@ curl --resolve ztnet.cdreamz.duckdns.org:443:127.0.0.1 \
   https://ztnet.cdreamz.duckdns.org/
 ```
 
-A 502 usually means that the backend is not attached to `edge`, the service
-name is incorrect, or the service is not listening yet. Do not attach Caddy
-to private networks just to bypass a DNS problem; inspect network membership
-and logs instead.
+A 502 usually means that the backend is not attached to `edge`, the service name
+is incorrect, or the service is not listening yet. Do not attach Caddy to
+private networks just to bypass a DNS problem; inspect network membership and
+logs instead.
 
 ### Verifying Headscale ↔ Headplane
 
@@ -217,12 +214,11 @@ podman exec headscale_headscale_1 headscale health
 podman logs headscale_headplane_1
 ```
 
-Headplane should connect to `http://headscale:8080`. The
-`/var/run/docker.sock` socket in Headplane is the Podman API socket and must
-not be confused with `/var/run/headscale/headscale.sock`. For HTTP
-communication failures, check both container statuses, membership in
-`headscale_internal`, and Headplane logs. Do not publish the gRPC port to the
-host.
+Headplane should connect to `http://headscale:8080`. The `/var/run/docker.sock`
+socket in Headplane is the Podman API socket and must not be confused with
+`/var/run/headscale/headscale.sock`. For HTTP communication failures, check both
+container statuses, membership in `headscale_internal`, and Headplane logs. Do
+not publish the gRPC port to the host.
 
 There is currently no running Headscale container in this checkout, so the
 current SELinux label and historical ownership of an existing volume cannot be
@@ -230,3 +226,178 @@ confirmed from the repository alone. Run the commands above on the host where
 the error occurred. The configuration and reproduction of the default rootless
 named volume nevertheless establish that the `Z,U` fix removes the permission
 conflict without affecting data.
+
+## Post-bringup configuration
+
+A successful `make up` only starts the containers. Complete the following
+one-time setup in the web interfaces before using the services.
+
+### 1. Headplane initial login
+
+1. Open `https://headplane.cdreamz.duckdns.org/admin/`.
+2. Generate a Headscale API key inside the Headscale container:
+
+   ```sh
+   podman exec -it headscale_headscale_1 \
+     headscale apikeys create --expiration 90d
+   ```
+
+3. Copy the generated key and enter it in the Headplane login screen.
+4. Store the key securely. It cannot be retrieved later. If lost, generate a new
+   one.
+
+Headplane uses this key to authenticate against the Headscale API. The key is
+not the same as `HEADPLANE_COOKIE_SECRET` from `.env`.
+
+### 2. ZTNet controller configuration
+
+Open `https://ztnet.cdreamz.duckdns.org/` and log in.
+
+Before creating networks, configure the connection to the local ZeroTier
+controller:
+
+1. Open the ZTNet controller settings.
+2. Set the **Local ZeroTier URL** to:
+
+   ```text
+   http://zerotier:9993
+   ```
+
+   Do not use `http://127.0.0.1:9993` or `http://localhost:9993`. ZTNet and
+   ZeroTier run in separate containers, so `localhost` would refer to the ZTNet
+   container itself.
+
+3. Retrieve the controller authentication token:
+
+   ```sh
+   podman exec ztnet_zerotier_1 \
+     cat /var/lib/zerotier-one/authtoken.secret
+   ```
+
+4. Copy the token into the corresponding **ZeroTier Secret / Auth Token** field
+   in ZTNet.
+5. Save the settings.
+
+The `zerotier` hostname resolves through the shared `ztnet_internal` network.
+The controller API is available to ZTNet over TCP port `9993`; it does not need
+to be exposed publicly.
+
+Verify the connection before proceeding. If network creation fails, check the
+ZTNet logs:
+
+```sh
+podman logs --since 5m ztnet_ztnet_1
+```
+
+An error mentioning `ECONNREFUSED 127.0.0.1:9993` means that the controller URL
+is still incorrect.
+
+### 3. Create the ZeroTier network
+
+After configuring the controller:
+
+1. Open the Networks section in ZTNet.
+2. Select **Create Network**.
+3. Configure the network name, IPv4 assignment range, and other desired network
+   settings.
+4. Save the network.
+5. Copy its Network ID.
+
+The Network ID is needed when joining clients.
+
+### 4. Configure a private ZeroTier Planet (optional)
+
+If using your own Planet instead of the public ZeroTier root infrastructure:
+
+1. Open the Planet management section in ZTNet.
+2. Create or configure the private Planet.
+3. Configure its public endpoint using the OCI VM's public IP address and UDP
+   port `9993`.
+4. Ensure that UDP `9993` is allowed by the OCI security rules and the host
+   firewall.
+5. Generate and download the Planet file.
+6. Install the generated Planet file on every ZeroTier client that should use
+   this private infrastructure.
+
+On Linux, the client Planet file is located at:
+
+```text
+/var/lib/zerotier-one/planet
+```
+
+Back up the existing file before replacing it. Do not replace the client's
+`identity.secret` or `identity.public` files.
+
+On clients that use a mobile application supporting custom Planet files, follow
+that application's import procedure. Some mobile ZeroTier clients do not support
+custom Planets directly.
+
+### 5. Join and authorize ZeroTier clients
+
+For each client:
+
+1. Install ZeroTier and, if required, import the private Planet file.
+2. Join the network using its Network ID.
+3. Open the network's member list in ZTNet.
+4. Find the new device and enable **Authorized**.
+5. Wait for the controller to assign the device an IP address.
+
+On Linux:
+
+```sh
+sudo zerotier-cli join <NETWORK_ID>
+sudo zerotier-cli listnetworks
+```
+
+A network with status `ACCESS_DENIED` requires authorization in ZTNet. A status
+of `OK` indicates that the client has successfully joined.
+
+### 6. Headscale client registration
+
+Headscale does not automatically register clients just because the server is
+running.
+
+1. Open Headplane and create a Headscale user if one does not already exist.
+2. Generate a pre-authentication key for that user, using Headplane or the
+   Headscale CLI.
+3. On each client, install the Tailscale client and point it to the Headscale
+   server:
+
+   ```sh
+   tailscale up \
+     --login-server https://headscale.cdreamz.duckdns.org \
+     --authkey <PREAUTH_KEY>
+   ```
+
+4. Verify that the node appears in Headplane or in the Headscale node list:
+
+   ```sh
+   podman exec headscale_headscale_1 headscale nodes list
+   ```
+
+### 7. Final verification
+
+After completing the setup, verify that:
+
+- Headplane can connect to Headscale and displays registered nodes.
+- ZTNet can communicate with the local ZeroTier controller.
+- ZeroTier networks can be created.
+- ZeroTier clients appear in ZTNet and are authorized.
+- If using a private Planet, clients have imported the correct Planet file and
+  can reach its root endpoints.
+- Caddy serves all three web interfaces over HTTPS.
+
+These steps are normally required only after a fresh installation or when
+recreating the relevant application configuration. Restarting containers with
+`make restart` should not require repeating them, provided persistent volumes
+and configuration files have been preserved.
+
+**Security notes:**
+
+- Treat Headscale API keys, ZeroTier authentication tokens, and
+  pre-authentication keys as secrets.
+- Do not commit these values to Git.
+- Do not delete PostgreSQL, Headscale, Headplane, or ZeroTier data volumes
+  during routine restarts or updates.
+- A private Planet does not replace network authorization: each ZeroTier member
+  must still be authorized by the controller.
