@@ -12,3 +12,11 @@ ztnet.cdreamz.duckdns.org {
     reverse_proxy ztnet:3000
 }
 
+smp.cdreamz.duckdns.org {
+    reverse_proxy https://smp-server:5223 {
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
+

@@ -1,10 +1,11 @@
 # Homelab: rootless Podman
 
-This repository runs three independent `podman-compose` projects as a regular
+This repository runs four independent `podman-compose` projects as a regular
 user:
 
 - **Headscale + Headplane**,
 - **ZTNet + PostgreSQL + ZeroTier**,
+- **SimpleX SMP Server** as a messaging relay,
 - **Caddy** as the shared reverse proxy.
 
 The [Makefile](./Makefile) is the central management mechanism.
@@ -21,11 +22,18 @@ Internal traffic is isolated:
 - ZTNet, PostgreSQL, and ZeroTier use the private `ztnet_internal` network;
 - Caddy is not attached to either private network, and PostgreSQL and ZeroTier
   are not attached to `edge`;
-- only Caddy publishes HTTP/HTTPS ports, while ZeroTier publishes UDP `9993`.
+- Caddy publishes HTTP/HTTPS ports, SMP publishes TCP `5223`, and ZeroTier
+  publishes UDP `9993`.
 
 Headplane communicates with Headscale over HTTP at `http://headscale:8080` on
 `headscale_internal`. Its Docker integration uses only the Podman API socket
 mounted as `/var/run/docker.sock`; it does not use the Headscale gRPC socket.
+
+SimpleX SMP Server is attached to `edge` and publishes TCP `5223`, which is
+the relay port used by SimpleX clients. Caddy serves the HTTPS information page
+for `smp.cdreamz.duckdns.org` and proxies it to the SMP container over the
+internal `edge` network. Caddy does not proxy the SMP protocol itself; clients
+connect to `smp.cdreamz.duckdns.org:5223`.
 
 ## Requirements
 
@@ -74,8 +82,9 @@ cp .env.example .env
 sed -i "s#^POSTGRES_PASSWORD=.*#POSTGRES_PASSWORD=$(openssl rand -hex 32)#" .env
 sed -i "s#^NEXTAUTH_SECRET=.*#NEXTAUTH_SECRET=$(openssl rand -hex 32)#" .env
 sed -i "s#^HEADPLANE_COOKIE_SECRET=.*#HEADPLANE_COOKIE_SECRET=$(openssl rand -hex 16)#" .env
+sed -i "s#^SMP_PASSWORD=.*#SMP_PASSWORD=$(openssl rand -hex 32)#" .env
 chmod 600 .env
-podman network create edge
+make network
 make config
 make up
 make status
@@ -86,7 +95,8 @@ remove volumes during initial setup or upgrades. Before exposing the services,
 configure DNS for the names in the [Caddyfile](./caddy/Caddyfile) and restrict
 administrative access to Headplane and ZTNet with firewall rules.
 
-Startup order is fixed: Headscale/Headplane first, then ZTNet, and Caddy last.
+Startup order is fixed: Headscale/Headplane first, then ZTNet, SMP, and Caddy
+last.
 Shutdown happens in reverse order. The user service
 [homelab.service](./systemd/homelab.service) invokes the same Makefile targets
 and can be enabled after manual verification:
@@ -107,18 +117,21 @@ Run these commands from the repository root as the rootless user:
 | `make network` | Create the shared `edge` network if it does not exist.                                                |
 | `make config`  | Validate interpolation and syntax for all Compose files.                                              |
 | `make up`      | Start all stacks in the required order.                                                               |
-| `make down`    | Stop Caddy, then ZTNet, then Headscale.                                                               |
+| `make down`    | Stop Caddy, then SMP, ZTNet, and Headscale.                                                           |
 | `make restart` | Run `down`, followed by `up`.                                                                         |
 | `make status`  | Show the status of containers in all projects.                                                        |
 | `make logs`    | Show the last 100 log lines for each project.                                                         |
-| `make pull`    | Pull the image tags declared in Compose.                                                              |
-| `make update`  | Run backup, `pull`, and restart the stacks.                                                           |
+| `make pull`    | Pull the image tags declared in all Compose files, including SMP.                                     |
+| `make update`  | Run backup, `pull`, and restart all stacks, including SMP.                                            |
 | `make backup`  | Stop the stacks, archive the repository and volumes, verify the archives, and start the stacks again. |
 
 `make update` does not select newer image versions and does not perform
-PostgreSQL migrations. Change image tags manually after reviewing the vendor's
-release notes, make a backup, and then run `make update`. Backups contain
-secrets and authentication data; set `BACKUP_ROOT` to choose another location:
+PostgreSQL or SMP data migrations. Change image tags manually after reviewing
+the vendor's release notes, make a backup, and then run `make update`.
+The configured SMP image is `docker.io/simplexchat/smp-server:v7.1`; change
+this tag in [smp_server/compose.yml](./smp_server/compose.yml) only after
+checking SimpleX compatibility and release notes. Backups contain secrets and
+authentication data; set `BACKUP_ROOT` to choose another location:
 
 ```sh
 BACKUP_ROOT="$HOME/homelab-backups" make backup
@@ -134,12 +147,36 @@ BACKUP_ROOT="$HOME/homelab-backups" make backup
 4. Create the `edge` network with `make network`.
 5. Run `make config`, followed by `make up`.
 6. Verify `make status`, logs, Headplane and ZTNet logins, existing Headscale
-   nodes, and ZeroTier networks.
+   nodes, ZeroTier networks, and the SMP relay.
 
 On the first startup after this change, Compose may create `headscale_internal`
 and `ztnet_internal`. These are network metadata only; Headscale SQLite data,
 Headplane data, PostgreSQL data, and the ZeroTier identity remain in their
-existing volumes.
+existing volumes. SMP configuration and state are stored in the
+`smp_smp-config` and `smp_smp-state` volumes.
+
+## SimpleX SMP Server
+
+The SMP relay is available at:
+
+```text
+smp://<server-fingerprint>@smp.cdreamz.duckdns.org:5223
+```
+
+The server fingerprint is generated on the first startup and is shown in the
+SMP container logs:
+
+```sh
+make logs
+podman logs smp_smp-server_1
+```
+
+Add the generated address in the SimpleX client under **Settings → Network &
+Servers → SMP servers**. The optional `SMP_PASSWORD` value in `.env` protects
+queue creation and should be a long random secret. The relay requires a public
+DNS record for `smp.cdreamz.duckdns.org` and TCP port `5223` open in the
+firewall. The HTTPS information page is served through Caddy, but the SimpleX
+relay connection uses port `5223` directly.
 
 ## Headscale troubleshooting
 

@@ -5,6 +5,7 @@ ENV_FILE ?= .env
 HEADSCALE_COMPOSE := $(COMPOSE) --env-file $(ENV_FILE) -p headscale -f headscale/compose.yaml
 ZTNET_COMPOSE := $(COMPOSE) --env-file $(ENV_FILE) -p ztnet -f ztnet/compose.yaml
 CADDY_COMPOSE := $(COMPOSE) --env-file $(ENV_FILE) -p caddy -f caddy/compose.yaml
+SMP_COMPOSE := $(COMPOSE) --env-file $(ENV_FILE) -p smp -f smp_server/compose.yml
 
 .PHONY: network config up down restart status logs pull update backup
 
@@ -16,14 +17,17 @@ config:
 	$(CADDY_COMPOSE) config >/dev/null
 	$(HEADSCALE_COMPOSE) config >/dev/null
 	$(ZTNET_COMPOSE) config >/dev/null
+	$(SMP_COMPOSE) config >/dev/null
 
 up: network config
 	$(HEADSCALE_COMPOSE) up -d
 	$(ZTNET_COMPOSE) up -d
+	$(SMP_COMPOSE) up -d
 	$(CADDY_COMPOSE) up -d
 
 down:
 	$(CADDY_COMPOSE) stop
+	$(SMP_COMPOSE) stop
 	$(ZTNET_COMPOSE) stop
 	$(HEADSCALE_COMPOSE) stop
 
@@ -33,16 +37,19 @@ status:
 	$(HEADSCALE_COMPOSE) ps
 	$(ZTNET_COMPOSE) ps
 	$(CADDY_COMPOSE) ps
+	$(SMP_COMPOSE) ps
 
 logs:
 	$(HEADSCALE_COMPOSE) logs --tail=100
 	$(ZTNET_COMPOSE) logs --tail=100
 	$(CADDY_COMPOSE) logs --tail=100
+	$(SMP_COMPOSE) logs --tail=100
 
 pull: config
 	$(HEADSCALE_COMPOSE) pull
 	$(ZTNET_COMPOSE) pull
 	$(CADDY_COMPOSE) pull
+	$(SMP_COMPOSE) pull
 
 update: backup pull up
 
@@ -51,7 +58,7 @@ backup:
 	@set -Eeuo pipefail; \
 	backup_root="$${BACKUP_ROOT:-$$HOME/homelab-backups}"; \
 	backup="$$backup_root/$$(date -u +%Y%m%dT%H%M%SZ)"; \
-	volumes=(headscale_headscale-data headscale_headplane-data caddy_caddy-data caddy_caddy-config ztnet_zerotier ztnet_postgres18-data); \
+	volumes=(headscale_headscale-data headscale_headplane-data caddy_caddy-data caddy_caddy-config ztnet_zerotier ztnet_postgres18-data smp_smp-config smp_smp-state); \
 	for volume in "$${volumes[@]}"; do \
 		podman volume exists "$$volume" || { echo "Required volume does not exist: $$volume" >&2; exit 1; }; \
 	done; \

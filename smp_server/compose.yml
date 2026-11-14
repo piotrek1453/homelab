@@ -1,0 +1,26 @@
+services:
+  smp-server:
+    image: docker.io/simplexchat/smp-server:v7.1
+    restart: unless-stopped
+    environment:
+      ADDR: smp.cdreamz.duckdns.org
+      PASS: "${SMP_PASSWORD:-}"
+      WEB_MANUAL: "1"
+    volumes:
+      - smp-config:/etc/opt/simplex:Z
+      - smp-state:/var/opt/simplex:Z
+    ports:
+      - "5223:5223/tcp"
+    networks:
+      edge:
+        aliases:
+          - smp-server
+
+volumes:
+  smp-config:
+  smp-state:
+
+networks:
+  edge:
+    external: true
+    name: edge
