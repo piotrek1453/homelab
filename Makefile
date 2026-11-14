@@ -58,7 +58,7 @@ backup:
 	@set -Eeuo pipefail; \
 	backup_root="$${BACKUP_ROOT:-$$HOME/homelab-backups}"; \
 	backup="$$backup_root/$$(date -u +%Y%m%dT%H%M%SZ)"; \
-	volumes=(headscale_headscale-data headscale_headplane-data caddy_caddy-data caddy_caddy-config ztnet_zerotier ztnet_postgres18-data smp_smp-config smp_smp-state); \
+	volumes=(headscale_headscale-data headscale_headplane-data caddy_caddy-data caddy_caddy-config ztnet_zerotier ztnet_postgres18-data smp_smp-config smp_smp-state smp_xftp-config smp_xftp-state smp_xftp-files); \
 	for volume in "$${volumes[@]}"; do \
 		podman volume exists "$$volume" || { echo "Required volume does not exist: $$volume" >&2; exit 1; }; \
 	done; \

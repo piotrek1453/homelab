@@ -16,9 +16,30 @@ services:
         aliases:
           - smp-server
 
+  xftp-server:
+    image: docker.io/simplexchat/xftp-server:v7.1
+    restart: unless-stopped
+    environment:
+      ADDR: xftp.cdreamz.duckdns.org
+      QUOTA: "${XFTP_QUOTA:-120gb}"
+      PASS: "${XFTP_PASSWORD:-}"
+    volumes:
+      - xftp-config:/etc/opt/simplex-xftp:Z
+      - xftp-state:/var/opt/simplex-xftp:Z
+      - xftp-files:/srv/xftp:Z
+    ports:
+      - "8443:443/tcp"
+    networks:
+      edge:
+        aliases:
+          - xftp-server
+
 volumes:
   smp-config:
   smp-state:
+  xftp-config:
+  xftp-state:
+  xftp-files:
 
 networks:
   edge:

@@ -6,6 +6,7 @@ user:
 - **Headscale + Headplane**,
 - **ZTNet + PostgreSQL + ZeroTier**,
 - **SimpleX SMP Server** as a messaging relay,
+- **SimpleX XFTP Server** for file transfer,
 - **Caddy** as the shared reverse proxy.
 
 The [Makefile](./Makefile) is the central management mechanism.
@@ -34,6 +35,11 @@ the relay port used by SimpleX clients. Caddy serves the HTTPS information page
 for `smp.cdreamz.duckdns.org` and proxies it to the SMP container over the
 internal `edge` network. Caddy does not proxy the SMP protocol itself; clients
 connect to `smp.cdreamz.duckdns.org:5223`.
+
+SimpleX XFTP Server is also attached to `edge`. Its protocol port `443` is
+published as host port `8443` because Caddy already owns host port `443`.
+Caddy proxies the XFTP information page at `xftp.cdreamz.duckdns.org`; XFTP
+clients connect directly to `xftp.cdreamz.duckdns.org:8443`.
 
 ## Requirements
 
@@ -95,8 +101,8 @@ remove volumes during initial setup or upgrades. Before exposing the services,
 configure DNS for the names in the [Caddyfile](./caddy/Caddyfile) and restrict
 administrative access to Headplane and ZTNet with firewall rules.
 
-Startup order is fixed: Headscale/Headplane first, then ZTNet, SMP, and Caddy
-last.
+Startup order is fixed: Headscale/Headplane first, then ZTNet, SMP/XFTP, and
+Caddy last.
 Shutdown happens in reverse order. The user service
 [homelab.service](./systemd/homelab.service) invokes the same Makefile targets
 and can be enabled after manual verification:
@@ -147,13 +153,15 @@ BACKUP_ROOT="$HOME/homelab-backups" make backup
 4. Create the `edge` network with `make network`.
 5. Run `make config`, followed by `make up`.
 6. Verify `make status`, logs, Headplane and ZTNet logins, existing Headscale
-   nodes, ZeroTier networks, and the SMP relay.
+   nodes, ZeroTier networks, the SMP relay, and the XFTP server.
 
 On the first startup after this change, Compose may create `headscale_internal`
 and `ztnet_internal`. These are network metadata only; Headscale SQLite data,
 Headplane data, PostgreSQL data, and the ZeroTier identity remain in their
 existing volumes. SMP configuration and state are stored in the
-`smp_smp-config` and `smp_smp-state` volumes.
+`smp_smp-config` and `smp_smp-state` volumes. XFTP configuration, state, and
+uploaded files are stored in `smp_xftp-config`, `smp_xftp-state`, and
+`smp_xftp-files`.
 
 ## SimpleX SMP Server
 
@@ -177,6 +185,31 @@ queue creation and should be a long random secret. The relay requires a public
 DNS record for `smp.cdreamz.duckdns.org` and TCP port `5223` open in the
 firewall. The HTTPS information page is served through Caddy, but the SimpleX
 relay connection uses port `5223` directly.
+
+## SimpleX XFTP Server
+
+The XFTP server uses the official image
+`docker.io/simplexchat/xftp-server:v7.1` and a `120gb` default storage quota.
+Set `XFTP_QUOTA` in `.env` to change the quota. `XFTP_PASSWORD` optionally
+protects uploads.
+
+The XFTP address has the following form:
+
+```text
+xftp://<server-fingerprint>@xftp.cdreamz.duckdns.org:8443
+```
+
+The fingerprint is generated on first startup and can be found in the logs:
+
+```sh
+podman logs smp_xftp-server_1
+```
+
+Create the DNS record for `xftp.cdreamz.duckdns.org` and allow TCP `8443`
+through the firewall. The XFTP protocol cannot share Caddy's host port `443`
+through a normal HTTP reverse proxy, so the explicit `:8443` port is required
+in the client address. The HTTPS information page remains available through
+Caddy on standard port `443`.
 
 ## Headscale troubleshooting
 

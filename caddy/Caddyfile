@@ -20,3 +20,11 @@ smp.cdreamz.duckdns.org {
     }
 }
 
+xftp.cdreamz.duckdns.org {
+    reverse_proxy https://xftp-server:443 {
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
+

@@ -13,6 +13,8 @@ env:
   NEXTAUTH_SECRET: ci-nextauth-secret-please-use-a-real-secret
   HEADPLANE_COOKIE_SECRET: ci-headplane-cookie-secret-ci-01
   SMP_PASSWORD: ci-smp-password
+  XFTP_QUOTA: 1gb
+  XFTP_PASSWORD: ci-xftp-password
 
 jobs:
   compose:
@@ -50,8 +52,8 @@ jobs:
 
       - name: Validate Compose files
         run: |
-          printf 'POSTGRES_PASSWORD=%s\nNEXTAUTH_SECRET=%s\nHEADPLANE_COOKIE_SECRET=%s\nSMP_PASSWORD=%s\nCONTAINER_SOCKET=%s\n' \
-            "$POSTGRES_PASSWORD" "$NEXTAUTH_SECRET" "$HEADPLANE_COOKIE_SECRET" "$SMP_PASSWORD" "$CONTAINER_SOCKET" > .env
+          printf 'POSTGRES_PASSWORD=%s\nNEXTAUTH_SECRET=%s\nHEADPLANE_COOKIE_SECRET=%s\nSMP_PASSWORD=%s\nXFTP_QUOTA=%s\nXFTP_PASSWORD=%s\nCONTAINER_SOCKET=%s\n' \
+            "$POSTGRES_PASSWORD" "$NEXTAUTH_SECRET" "$HEADPLANE_COOKIE_SECRET" "$SMP_PASSWORD" "$XFTP_QUOTA" "$XFTP_PASSWORD" "$CONTAINER_SOCKET" > .env
           chmod 600 .env
           make config
 
@@ -83,6 +85,7 @@ jobs:
           podman network exists headscale_internal
           podman network exists ztnet_internal
           test "$(podman inspect --format '{{.State.Status}}' smp_smp-server_1)" = running
+          test "$(podman inspect --format '{{.State.Status}}' smp_xftp-server_1)" = running
           test "$(podman inspect --format '{{.Config.User}}' headscale_headscale_1)" = "10001:10001"
           runtime_mount="$(podman volume inspect --format '{{.Mountpoint}}' headscale_headscale-run)"
           test "$(podman unshare stat -c '%u:%g' "$runtime_mount")" = "10001:10001"
@@ -122,6 +125,7 @@ jobs:
           check_route headplane.cdreamz.duckdns.org /admin/
           check_route ztnet.cdreamz.duckdns.org /
           check_route smp.cdreamz.duckdns.org /
+          check_route xftp.cdreamz.duckdns.org /
 
       - name: Show diagnostics on failure
         if: failure()
